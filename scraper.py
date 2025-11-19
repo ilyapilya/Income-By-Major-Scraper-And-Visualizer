@@ -2,12 +2,13 @@ import time, json, re, requests
 from typing import Dict, List, Set, Tuple
 from bs4 import BeautifulSoup as bs
 
+# Constants
 BASE_URL = "https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/recent-grads.csv"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; CollegeIncomeScraper/1.0)"
 }
 
-# Fetches HTML content from URL
+# Fetches HTML content from URL. Also fetches CSV content.
 def fetch_page_html(page: int) -> str | None:
     try:
         resp = requests.get(BASE_URL, timeout=10)
@@ -76,6 +77,7 @@ def parse_job_data_csv(csv_content : str) -> list[Dict]:
     
     return majors
 
+# Saves joblist to JSON file: jobs.json or other if specified
 def save_to_json(jobs : List[Dict], filename: str = "jobs.json") -> None:
     try:
         with open(filename, 'w') as f:
@@ -89,26 +91,30 @@ def save_to_json(jobs : List[Dict], filename: str = "jobs.json") -> None:
 if __name__ == "__main__":
     print("Starting Major to Income Scraper...")
     
-    # Step 1: Fetch HTML content as str
-    html_content = fetch_page_html(1)
+    # Step 1: Fetch CSV content
+    csv_content = fetch_page_html(1)
 
-    # Initializing jobs
+    # Initialize jobs
     jobs = None
 
-    # Step 2: Parse job data from HTML
-    if html_content is not None:
-        print(f"Successfully fetched {len(html_content)} characters of HTML")
-        jobs = parse_job_data_csv(html_content)
-        print(f"Found {len(jobs)} jobs")
+    # Step 2: Parse job data from CSV
+    if csv_content is not None:
+        print(f"Successfully fetched {len(csv_content)} characters of CSV")
+        jobs = parse_job_data_csv(csv_content)
+        print(f"Found {len(jobs)} majors")
         
-        for i in range(max(len(jobs), 10)):
+        # Display first 10 results
+        for i in range(min(len(jobs), 10)):
             print(jobs[i])
     else:
-        print("Failed to fetch page")
+        print("Failed to fetch CSV data")
 
     # Step 3: Save to JSON
     if jobs:
-        print(f"Saving {len(jobs)} jobs to JSON file: jobs.json")
+        print(f"Saving {len(jobs)} majors to JSON file: jobs.json")
         save_to_json(jobs, "jobs.json")
+
+    # TODO: Step 4: Save to MySQL DB
+    # TODO: Step 5: Use matplotlib to plot Major vs Income
 
     
