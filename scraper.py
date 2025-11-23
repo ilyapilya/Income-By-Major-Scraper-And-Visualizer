@@ -1,5 +1,5 @@
-import time, json, re, requests
-from typing import Dict, List, Set, Tuple
+import json, re, requests
+from typing import Dict, List
 from bs4 import BeautifulSoup as bs
 from database.database import Database
 from dotenv import load_dotenv
