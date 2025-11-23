@@ -1,10 +1,18 @@
 import pymysql
+import os
 from typing import List, Dict, Optional
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 class Database:
     def __init__(self, host: str = "localhost", user: str = "root", 
-                 password: str = "root", database: str = "majors_db"):
+                 password: Optional[str] = None, database: str = "income_major_db"):
+        # If password not provided, load from .env
+        if password is None:
+            password = os.getenv("MY_SQL_PASSWORD", "root")
         """Initialize database connection parameters."""
         self.host = host
         self.user = user

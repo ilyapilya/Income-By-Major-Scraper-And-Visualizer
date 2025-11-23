@@ -1,7 +1,8 @@
-# Virtual Environment
+# Virtual Environment(s)
 venv/
+.venv/
 
-# Environment Variables
+# Environment Configuration
 .env
 
 # Pycache

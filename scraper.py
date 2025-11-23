@@ -1,6 +1,12 @@
 import time, json, re, requests
 from typing import Dict, List, Set, Tuple
 from bs4 import BeautifulSoup as bs
+from database.database import Database
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv() 
 
 # Constants
 BASE_URL = "https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/recent-grads.csv"
@@ -97,6 +103,9 @@ if __name__ == "__main__":
     # Initialize jobs
     jobs = None
 
+    # Initialize DB Pool (password loaded from .env)
+    db = Database(host="localhost", user="root", database="income_major_db")
+
     # Step 2: Parse job data from CSV
     if csv_content is not None:
         print(f"Successfully fetched {len(csv_content)} characters of CSV")
@@ -114,7 +123,22 @@ if __name__ == "__main__":
         print(f"Saving {len(jobs)} majors to JSON file: jobs.json")
         save_to_json(jobs, "jobs.json")
 
-    # TODO: Step 4: Save to MySQL DB
+    # Step 4: Save to MySQL DB and Display Statistics
+    if jobs:
+        print(f"Storing {len(jobs)} into MySQL DB")
+        db.insert_majors(jobs)
+        
+        # Fetching statistics
+        print("Fetching updated statistics...")
+        stats = db.get_statistics()
+        if stats:
+            print(f"Total Majors: {stats['total_majors']}")
+            print(f"Average Income: ${stats['avg_income']:,.2f}")
+            print(f"Highest Income: ${stats['max_income']:,}")
+            print(f"Lowest Income: ${stats['min_income']:,}")
+        else:
+            print("Failed to fetch statistics from DB")
+    
     # TODO: Step 5: Use matplotlib to plot Major vs Income
 
     
