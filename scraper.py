@@ -2,6 +2,7 @@ import json, re, requests
 from typing import Dict, List
 from bs4 import BeautifulSoup as bs
 from database.database import Database
+from statplot import Plotter
 from dotenv import load_dotenv
 import os
 
@@ -10,6 +11,10 @@ load_dotenv()
 
 # Constants
 BASE_URL = "https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/recent-grads.csv"
+ALTERNATE_SOURCES = [
+    "https://raw.githubusercontent.com/datasets/college-majors/master/majors-list.csv",
+    "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-10-16/recent-grads.csv"
+]
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; CollegeIncomeScraper/1.0)"
 }
@@ -23,6 +28,39 @@ def fetch_page_html(page: int) -> str | None:
     except requests.RequestException as e:
         print(f"Unable to fetch data: {e}")
         return None
+
+# Fetches data from multiple sources and combines them
+def fetch_from_multiple_sources() -> List[Dict] | None:
+    """
+    Attempts to fetch data from multiple sources and combines them.
+    Automatically handles duplicate majors by averaging their incomes.
+    """
+    all_jobs = []
+    urls = [BASE_URL] + ALTERNATE_SOURCES
+    
+    for url in urls:
+        try:
+            resp = requests.get(url, timeout=10, headers=HEADERS)
+            resp.raise_for_status()
+            print(f"✓ Successfully fetched from {url.split('/')[-1]}")
+            
+            # Try to parse as CSV
+            jobs = parse_job_data_csv(resp.text)
+            all_jobs.extend(jobs)
+            
+        except requests.RequestException as e:
+            print(f"⚠ Failed to fetch from {url}: {e}")
+            continue
+    
+    if not all_jobs:
+        print("✗ Failed to fetch from all sources")
+        return None
+    
+    print(f"✓ Combined data from {len(urls)} sources: {len(all_jobs)} total records")
+    
+    # Average duplicates
+    unique_jobs = average_duplicate_majors(all_jobs)
+    return unique_jobs
 
 # Parses income string to integer from job string
 def parse_income_value(raw_str: str) -> int | None:
@@ -93,6 +131,36 @@ def save_to_json(jobs : List[Dict], filename: str = "jobs.json") -> None:
     except IOError as e:
         print(f"Error saving to file: {e}")
 
+# Averages duplicate majors by computing mean income
+def average_duplicate_majors(jobs: List[Dict]) -> List[Dict]:
+    """
+    Takes a list of jobs and averages income for duplicate majors.
+    Returns a new list with unique majors and averaged income.
+    """
+    major_incomes: Dict[str, List[int]] = {}
+    
+    # Group incomes by major name
+    for job in jobs:
+        major = job['major'].strip().upper()  # Normalize
+        income = job['income']
+        
+        if major not in major_incomes:
+            major_incomes[major] = []
+        major_incomes[major].append(income)
+    
+    # Calculate average income for each major
+    averaged_jobs = []
+    for major, incomes in major_incomes.items():
+        avg_income = sum(incomes) / len(incomes)
+        averaged_jobs.append({
+            'major': major,
+            'income': int(round(avg_income)),
+            'count': len(incomes)  # Track how many sources were averaged
+        })
+    
+    print(f"✓ Averaged {len(jobs)} jobs to {len(averaged_jobs)} unique majors")
+    return averaged_jobs
+
 
 if __name__ == "__main__":
     print("Starting Major to Income Scraper...")
@@ -139,6 +207,8 @@ if __name__ == "__main__":
         else:
             print("Failed to fetch statistics from DB")
     
-    # TODO: Step 5: Use matplotlib to plot Major vs Income
-
-    
+    # Step 5: Use matplotlib to plot Major vs Income
+    plotter = Plotter(jobs)
+    plotter.set_income_bounds(40000, 50000)
+    plotter.plot_major_vs_income()
+    plotter.save_plot("major_income_plot.png")
