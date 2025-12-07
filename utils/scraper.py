@@ -2,7 +2,7 @@ import json, re, requests
 from typing import Dict, List
 from bs4 import BeautifulSoup as bs
 from database.database import Database
-from statplot import Plotter
+from .statplot import Plotter
 from dotenv import load_dotenv
 import os
 

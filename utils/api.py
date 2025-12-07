@@ -1,7 +1,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from database.database import Database
-from statplot import Plotter
+from .statplot import Plotter
 import io
 import base64
 import matplotlib.pyplot as plt
