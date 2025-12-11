@@ -9,7 +9,7 @@ venv/
 __pycache__/
 *.pyc
 
-# Local Scraper JSON data file
+# Local JSON Scraper Data
 jobs.json
 
 node_modules/

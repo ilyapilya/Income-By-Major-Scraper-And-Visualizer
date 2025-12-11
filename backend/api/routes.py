@@ -2,6 +2,8 @@
 from flask import jsonify
 import io
 import base64
+import json
+from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from ..database import Database
@@ -12,48 +14,93 @@ from ..config import config
 db = Database(host=config.DB_HOST, user=config.DB_USER, 
               password=config.DB_PASSWORD, database=config.DB_NAME)
 
+# Load jobs from JSON as fallback
+JOBS_FILE = Path(__file__).parent.parent.parent / "jobs.json"
+
+def load_jobs_from_json():
+    """Load jobs from JSON file if available"""
+    try:
+        if JOBS_FILE.exists():
+            with open(JOBS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading jobs.json: {e}")
+    return None
+
 
 def register_routes(app):
     """Register all API routes with Flask app"""
     
     @app.route('/api/statistics', methods=['GET'])
     def get_statistics():
-        """Retrieve income statistics from database"""
+        """Retrieve income statistics from database or JSON"""
         try:
             stats = db.get_statistics()
             
-            if not stats:
-                return jsonify({"error": "Failed to retrieve statistics"}), 500
+            if stats:
+                # Got stats from database
+                top_majors = db.get_top_n_majors(10)
+                return jsonify({
+                    "total_majors": stats['total_majors'],
+                    "avg_income": round(float(stats['avg_income']), 2),
+                    "max_income": stats['max_income'],
+                    "min_income": stats['min_income'],
+                    "top_majors": top_majors,
+                    "source": "database"
+                }), 200
             
-            # Get additional details - top 10 majors
-            top_majors = db.get_top_n_majors(10)
+            # Fallback to JSON file
+            jobs = load_jobs_from_json()
+            if jobs:
+                incomes = [job['income'] for job in jobs]
+                top_10 = sorted(jobs, key=lambda x: x['income'], reverse=True)[:10]
+                
+                return jsonify({
+                    "total_majors": len(jobs),
+                    "avg_income": round(sum(incomes) / len(incomes), 2),
+                    "max_income": max(incomes),
+                    "min_income": min(incomes),
+                    "top_majors": top_10,
+                    "source": "json"
+                }), 200
             
-            return jsonify({
-                "total_majors": stats['total_majors'],
-                "avg_income": round(float(stats['avg_income']), 2),
-                "max_income": stats['max_income'],
-                "min_income": stats['min_income'],
-                "top_majors": top_majors
-            }), 200
+            return jsonify({"error": "No data available"}), 404
         
         except Exception as e:
+            # Final fallback to JSON
+            jobs = load_jobs_from_json()
+            if jobs:
+                incomes = [job['income'] for job in jobs]
+                top_10 = sorted(jobs, key=lambda x: x['income'], reverse=True)[:10]
+                
+                return jsonify({
+                    "total_majors": len(jobs),
+                    "avg_income": round(sum(incomes) / len(incomes), 2),
+                    "max_income": max(incomes),
+                    "min_income": min(incomes),
+                    "top_majors": top_10,
+                    "source": "json"
+                }), 200
+            
             return jsonify({"error": str(e)}), 500
 
     @app.route('/api/plot', methods=['GET'])
     def get_plot():
         """Generate and return plot as base64 encoded image"""
         try:
-            # Fetch all majors from database
+            # Try to fetch from database first
             all_majors = db.get_all_majors()
             
-            if not all_majors:
-                return jsonify({"error": "No data available for plotting"}), 404
-            
-            # Convert database results to job format
-            jobs = [
-                {"major": major['major'], "income": major['income']}
-                for major in all_majors
-            ]
+            if all_majors:
+                jobs = [
+                    {"major": major['major'], "income": major['income']}
+                    for major in all_majors
+                ]
+            else:
+                # Fallback to JSON
+                jobs = load_jobs_from_json()
+                if not jobs:
+                    return jsonify({"error": "No data available for plotting"}), 404
             
             # Create plotter and set bounds
             plotter = Plotter(jobs)
